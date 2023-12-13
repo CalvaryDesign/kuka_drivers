@@ -22,7 +22,8 @@ using namespace lifecycle_msgs::msg;  // NOLINT
 namespace kuka_rsi
 {
 RobotManagerNode::RobotManagerNode()
-: kuka_drivers_core::ROS2BaseLCNode("robot_manager")
+: kuka_drivers_core::ROS2BaseLCNode("robot_manager", 
+    rclcpp::NodeOptions().allow_undeclared_parameters(true))
 {
   auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
   qos.reliable();
@@ -48,6 +49,13 @@ RobotManagerNode::RobotManagerNode()
     kuka_drivers_core::ParameterSetAccessRights{true, false,
       false, false, false}, [this](const std::string & robot_model) {
       return this->onRobotModelChangeRequest(robot_model);
+    });
+
+  this->registerStaticParameter<std::string>(
+    "controller_to_load", "joint_trajectory_controller",
+    kuka_drivers_core::ParameterSetAccessRights{true, false,
+      false, false, false}, [this](const std::string & controller_to_load) {
+      return this->onControllerChangeRequest(controller_to_load);
     });
 }
 
@@ -115,14 +123,15 @@ RobotManagerNode::on_activate(const rclcpp_lifecycle::State &)
     RCLCPP_ERROR(get_logger(), "Could not activate hardware interface");
     return FAILURE;
   }
-
+  // get list of controllers to activate
+  auto controller_to_activate_param = this->get_parameter("controller_to_load");
 
   // Activate RT controller(s)
   auto controller_request =
     std::make_shared<SwitchController::Request>();
   controller_request->strictness = SwitchController::Request::STRICT;
   controller_request->activate_controllers =
-  {"joint_state_broadcaster", "joint_trajectory_controller"};
+  {"joint_state_broadcaster", controller_to_activate_param.as_string()};
 
   auto controller_response =
     kuka_drivers_core::sendRequest<SwitchController::Response>(
@@ -182,6 +191,12 @@ RobotManagerNode::on_deactivate(const rclcpp_lifecycle::State &)
 bool RobotManagerNode::onRobotModelChangeRequest(const std::string & robot_model)
 {
   robot_model_ = robot_model;
+  return true;
+}
+
+bool RobotManagerNode::onControllerChangeRequest(const std::string & controller_name)
+{
+  controller_ = controller_name;
   return true;
 }
 }  // namespace kuka_rsi

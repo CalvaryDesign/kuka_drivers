@@ -29,6 +29,7 @@ def launch_setup(context, *args, **kwargs):
     rsi_config_file = LaunchConfiguration('rsi_config_file')
     ros2_controller_config_file = LaunchConfiguration('ros2_controller_config_file')
     joint_traj_controller_config_file = LaunchConfiguration("joint_trajectory_controller_config_file")
+    controller_to_load = LaunchConfiguration("controller_to_load")
     ns = LaunchConfiguration('namespace')
     # if there is an actual namespace, we'll want to append it with "_"
     # so that when it's put into the URDF as the prefix, it'll look nice
@@ -109,7 +110,8 @@ def launch_setup(context, *args, **kwargs):
         namespace=ns.perform(context),
         package="kuka_kss_rsi_driver",
         executable="robot_manager_node",
-        parameters=[{'robot_model': robot_model}]
+        parameters=[{'robot_model': robot_model},
+                    {'controller_to_load': controller_to_load.perform(context)}]
     )
     robot_state_publisher = Node(
         namespace=ns.perform(context),
@@ -133,7 +135,7 @@ def launch_setup(context, *args, **kwargs):
 
     controller_names_and_config = [
         ("joint_state_broadcaster", []),
-        ("joint_trajectory_controller", joint_traj_controller_config),
+        ("calvary_joint_trajectory_soft_stoppable_controller", joint_traj_controller_config),
     ]
 
     controller_spawners = [controller_spawner(controllers)
@@ -180,5 +182,12 @@ def generate_launch_description():
         default_value="ros2_controller_config.yaml",
         description="Full file path pointing to a yaml file containing the configuration for the " +
         " controller manager node. The default will be gotten from kuka_kss_rsi_driver/config"
+    ))
+    launch_arguments.append(DeclareLaunchArgument(
+        'controller_to_load',
+        default_value="joint_trajectory_controller",
+        description="Motion controller (that is, excluding joint_state_broadcaster) to load. " +
+        "Must match the controller named in joint_trajectory_controller_config.yaml " +
+        "and ros2_controller_config.yaml"
     ))
     return LaunchDescription(launch_arguments + [OpaqueFunction(function=launch_setup)])
