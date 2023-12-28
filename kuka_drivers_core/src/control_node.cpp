@@ -18,7 +18,9 @@
 #include "controller_manager/controller_manager.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
-
+#include <std_msgs/msg/float64_multi_array.hpp>
+#include <realtime_tools/realtime_publisher.h>
+#include "realtime_tools/thread_priority.hpp"
 
 int main(int argc, char ** argv)
 {
@@ -50,16 +52,43 @@ int main(int argc, char ** argv)
           "You can use the driver but scheduler priority was not set");
       }
 
+      // // publisher for control period
+      rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr period_pub = 
+        controller_manager->shared_from_this()->create_publisher<std_msgs::msg::Float64MultiArray>("control_period", rclcpp::SystemDefaultsQoS());
+
+      realtime_tools::RealtimePublisher<std_msgs::msg::Float64MultiArray> rt_pub(period_pub);
+      rt_pub.msg_.data.push_back(0);
+      rt_pub.msg_.data.push_back(0);
+      rt_pub.msg_.data.push_back(0);
+      rt_pub.msg_.data.push_back(0);
+
       const rclcpp::Duration dt =
       rclcpp::Duration::from_seconds(1.0 / controller_manager->get_update_rate());
       std::chrono::milliseconds dt_ms {1000 / controller_manager->get_update_rate()};
-
       try {
+        rclcpp::Time read_time, update_time, write_time, current_time;
+        rclcpp::Duration measured_period(0,0);
+        // for calculating the measured period of the loop
+        rclcpp::Time previous_time = controller_manager->now();
         while (rclcpp::ok()) {
+          current_time = controller_manager->now();
+          measured_period = current_time - previous_time;
+          previous_time = current_time;
           if (is_configured) {
             controller_manager->read(controller_manager->now(), dt);
+            read_time = controller_manager->now();
             controller_manager->update(controller_manager->now(), dt);
+            update_time = controller_manager->now();
             controller_manager->write(controller_manager->now(), dt);
+            write_time = controller_manager->now();
+
+            if(rt_pub.trylock()){
+              rt_pub.msg_.data[0] = measured_period.seconds();
+              rt_pub.msg_.data[1] = (read_time - current_time).seconds();
+              rt_pub.msg_.data[2] = (update_time - read_time).seconds();
+              rt_pub.msg_.data[3] = (write_time - update_time).seconds();
+              rt_pub.unlockAndPublish();
+            }
           } else {
             controller_manager->update(controller_manager->now(), dt);
             std::this_thread::sleep_for(dt_ms);
