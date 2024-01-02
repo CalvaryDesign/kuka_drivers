@@ -43,7 +43,7 @@ int main(int argc, char ** argv)
 
   std::thread control_loop([controller_manager, &is_configured]() {
       struct sched_param param;
-      param.sched_priority = 95;
+      param.sched_priority = 99;
       if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
         RCLCPP_ERROR(controller_manager->get_logger(), "setscheduler error");
         RCLCPP_ERROR(controller_manager->get_logger(), strerror(errno));

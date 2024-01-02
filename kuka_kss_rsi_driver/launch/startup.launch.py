@@ -135,7 +135,7 @@ def launch_setup(context, *args, **kwargs):
 
     controller_names_and_config = [
         ("joint_state_broadcaster", []),
-        ("calvary_joint_trajectory_soft_stoppable_controller", joint_traj_controller_config),
+        ("joint_trajectory_controller", joint_traj_controller_config),
     ]
 
     controller_spawners = [controller_spawner(controllers)
