@@ -43,15 +43,22 @@ int main(int argc, char ** argv)
 
   std::thread control_loop([controller_manager, &is_configured]() {
       struct sched_param param;
-      param.sched_priority = 99;
-      if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
-        RCLCPP_ERROR(controller_manager->get_logger(), "setscheduler error");
-        RCLCPP_ERROR(controller_manager->get_logger(), strerror(errno));
-        RCLCPP_WARN(
-          controller_manager->get_logger(),
-          "You can use the driver but scheduler priority was not set");
-      }
+      param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+      pthread_t this_thread = pthread_self();
 
+      if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
+        RCLCPP_ERROR_STREAM(controller_manager->get_logger(),
+          "You can use the driver but scheduler priority was not set. The error is: " << strerror(errno));
+      }else{
+        // auto pid
+        int policy = sched_getscheduler(0);
+        RCLCPP_WARN_STREAM(controller_manager->get_logger(), "Setscheduler: " << strerror(errno));
+        // Check the new priority and scheduling policy
+        sched_getparam(this_thread, &param);
+        RCLCPP_WARN_STREAM(controller_manager->get_logger(),
+          "New Scheduling Policy: " << policy << std::endl <<
+          "New Priority: " << param.sched_priority);
+      }
       // // publisher for control period
       rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr period_pub = 
         controller_manager->shared_from_this()->create_publisher<std_msgs::msg::Float64MultiArray>("control_period", rclcpp::SystemDefaultsQoS());
