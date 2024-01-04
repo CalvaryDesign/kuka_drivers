@@ -23,7 +23,8 @@ using namespace lifecycle_msgs::msg;  // NOLINT
 namespace kuka_rsi
 {
 RobotManagerNode::RobotManagerNode()
-: kuka_drivers_core::ROS2BaseLCNode("robot_manager")
+: kuka_drivers_core::ROS2BaseLCNode("robot_manager", 
+    rclcpp::NodeOptions().allow_undeclared_parameters(true))
 {
   auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
   qos.reliable();
@@ -49,6 +50,13 @@ RobotManagerNode::RobotManagerNode()
     kuka_drivers_core::ParameterSetAccessRights{true, false,
       false, false, false}, [this](const std::string & robot_model) {
       return this->onRobotModelChangeRequest(robot_model);
+    });
+
+  this->registerStaticParameter<std::string>(
+    "controller_to_load", "joint_trajectory_controller",
+    kuka_drivers_core::ParameterSetAccessRights{true, false,
+      false, false, false}, [this](const std::string & controller_to_load) {
+      return this->onControllerChangeRequest(controller_to_load);
     });
 }
 
@@ -149,6 +157,12 @@ RobotManagerNode::on_deactivate(const rclcpp_lifecycle::State &)
 bool RobotManagerNode::onRobotModelChangeRequest(const std::string & robot_model)
 {
   robot_model_ = robot_model;
+  return true;
+}
+
+bool RobotManagerNode::onControllerChangeRequest(const std::string & controller_name)
+{
+  controller_ = controller_name;
   return true;
 }
 }  // namespace kuka_rsi

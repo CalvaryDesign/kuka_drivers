@@ -48,6 +48,8 @@ public:
 
 private:
   bool onRobotModelChangeRequest(const std::string & robot_model);
+  
+  bool onControllerChangeRequest(const std::string & controller_name);
 
   rclcpp::Client<controller_manager_msgs::srv::SetHardwareComponentState>::SharedPtr
     change_hardware_state_client_;
@@ -56,6 +58,7 @@ private:
   rclcpp::CallbackGroup::SharedPtr cbg_;
 
   std::string robot_model_;
+  std::string controller_;
 
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Bool>> is_configured_pub_;
   std_msgs::msg::Bool is_configured_msg_;
