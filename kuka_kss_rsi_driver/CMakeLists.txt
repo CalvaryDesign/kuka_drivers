@@ -1,0 +1,105 @@
+cmake_minimum_required(VERSION 3.5)
+project(kuka_kss_rsi_driver)
+
+# Default to C99
+if(NOT CMAKE_C_STANDARD)
+  set(CMAKE_C_STANDARD 99)
+endif()
+
+# Default to C++14
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(kuka_drivers_core REQUIRED)
+find_package(hardware_interface REQUIRED)
+find_package(controller_manager_msgs REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(angles REQUIRED)
+find_package(pugixml REQUIRED)
+
+include_directories(include)
+
+add_library(xml_handler SHARED
+  src/xml_handler/xml_element.cpp
+  src/xml_handler/xml_param.cpp
+  src/xml_handler/xml_string.cpp
+)
+
+add_library(${PROJECT_NAME} SHARED
+  # src/kuka_hardware_interface.cpp
+  src/rsi_command_handler.cpp
+  src/pugi_command_handler.cpp
+  src/hardware_interface.cpp
+)
+
+target_link_libraries(${PROJECT_NAME} xml_handler pugixml)
+
+# Causes the visibility macros to use dllexport rather than dllimport,
+# which is appropriate when building the dll but not consuming it.
+target_compile_definitions(${PROJECT_NAME} PRIVATE "JOINT_STATE_BROADCASTER_BUILDING_DLL")
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE "KUKA_KSS_RSI_DRIVER_BUILDING_LIBRARY")
+# prevent pluginlib from using boost
+target_compile_definitions(${PROJECT_NAME} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
+
+ament_target_dependencies(${PROJECT_NAME} rclcpp sensor_msgs hardware_interface angles)
+
+add_executable(robot_manager_node
+  src/robot_manager_node.cpp)
+ament_target_dependencies(robot_manager_node rclcpp kuka_drivers_core sensor_msgs controller_manager_msgs)
+target_link_libraries(robot_manager_node kuka_drivers_core::communication_helpers)
+
+pluginlib_export_plugin_description_file(hardware_interface hardware_interface.xml)
+
+install(TARGETS ${PROJECT_NAME} robot_manager_node xml_handler
+  DESTINATION lib/${PROJECT_NAME})
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_copyright REQUIRED)
+  find_package(ament_cmake_cppcheck REQUIRED)
+  find_package(ament_cmake_pep257 REQUIRED)
+  find_package(ament_cmake_flake8 REQUIRED)
+  find_package(ament_cmake_cpplint REQUIRED)
+  find_package(ament_cmake_lint_cmake REQUIRED)
+  find_package(ament_cmake_uncrustify REQUIRED)
+  find_package(ament_cmake_xmllint REQUIRED)
+
+  ament_cppcheck(--language=c++)
+  ament_pep257()
+  ament_flake8()
+  ament_cpplint()
+  ament_lint_cmake()
+  ament_uncrustify(--language=C++)
+  ament_xmllint(--exclude ros_rsi.rsi.xml)
+
+  enable_testing()
+  add_subdirectory(test)
+endif()
+
+# # EXPORTS
+ament_export_include_directories(
+  include
+)
+ament_export_libraries(
+  ${PROJECT_NAME}
+)
+ament_export_dependencies(
+  hardware_interface
+  pluginlib
+  rclcpp
+  rclcpp_lifecycle
+)
+
+install(DIRECTORY config launch
+  DESTINATION share/${PROJECT_NAME})
+
+ament_package()
