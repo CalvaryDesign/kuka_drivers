@@ -43,6 +43,8 @@
 #include <memory>
 #include <vector>
 
+// #include "kuka_rsi_hw_interface/kuka_hardware_interface.hpp"
+#include "angles/angles.h"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 
 #include "kuka_kss_rsi_driver/hardware_interface.hpp"
@@ -54,6 +56,8 @@ CallbackReturn KukaRSIHardwareInterface::on_init(const hardware_interface::Hardw
   if (hardware_interface::SystemInterface::on_init(info) != CallbackReturn::SUCCESS) {
     return CallbackReturn::ERROR;
   }
+
+  command_handler_ = RSICommandHandler();
 
   hw_states_.resize(info_.joints.size(), 0.0);
   hw_commands_.resize(info_.joints.size(), 0.0);
@@ -89,8 +93,6 @@ CallbackReturn KukaRSIHardwareInterface::on_init(const hardware_interface::Hardw
   }
 
   // RSI
-  in_buffer_.resize(1024);  // udp_server.h --> #define BUFSIZE 1024
-  out_buffer_.resize(1024);
 
   initial_joint_pos_.resize(info_.joints.size(), 0.0);
   joint_pos_correction_deg_.resize(info_.joints.size(), 0.0);
@@ -153,17 +155,62 @@ CallbackReturn KukaRSIHardwareInterface::on_activate(const rclcpp_lifecycle::Sta
   if (bytes < 100) {
     bytes = server_->recv(in_buffer_);
   }
+  command_handler_.SetLocale();
+  if (!command_handler_.Decode(in_buffer_, UDP_BUFFER_SIZE)) {
+    RCLCPP_ERROR(rclcpp::get_logger("KukaRSIHardwareInterface"), "Decode failed");
+    return CallbackReturn::FAILURE;
+  }
 
-  rsi_state_ = RSIState(in_buffer_);
+  // Position data
+  hw_states_[0] = angles::from_degrees(
+    command_handler_.GetState().GetElement("AIPos")->GetParam<double>("A1"));
+  hw_states_[1] = angles::from_degrees(
+    command_handler_.GetState().GetElement("AIPos")->GetParam<double>("A2"));
+  hw_states_[2] = angles::from_degrees(
+    command_handler_.GetState().GetElement("AIPos")->GetParam<double>("A3"));
+  hw_states_[3] = angles::from_degrees(
+    command_handler_.GetState().GetElement("AIPos")->GetParam<double>("A4"));
+  hw_states_[4] = angles::from_degrees(
+    command_handler_.GetState().GetElement("AIPos")->GetParam<double>("A5"));
+  hw_states_[5] = angles::from_degrees(
+    command_handler_.GetState().GetElement("AIPos")->GetParam<double>("A6"));
+
+  // Initial position data
+  initial_joint_pos_[0] = angles::from_degrees(
+    command_handler_.GetState().GetElement("ASPos")->GetParam<double>("A1"));
+  initial_joint_pos_[1] = angles::from_degrees(
+    command_handler_.GetState().GetElement("ASPos")->GetParam<double>("A2"));
+  initial_joint_pos_[2] = angles::from_degrees(
+    command_handler_.GetState().GetElement("ASPos")->GetParam<double>("A3"));
+  initial_joint_pos_[3] = angles::from_degrees(
+    command_handler_.GetState().GetElement("ASPos")->GetParam<double>("A4"));
+  initial_joint_pos_[4] = angles::from_degrees(
+    command_handler_.GetState().GetElement("ASPos")->GetParam<double>("A5"));
+  initial_joint_pos_[5] = angles::from_degrees(
+    command_handler_.GetState().GetElement("ASPos")->GetParam<double>("A6"));
+
+  // Ipoc data
+  ipoc_ = command_handler_.GetState().GetElement("IPOC")->GetParam<int64_t>("IPOC");
 
   for (size_t i = 0; i < info_.joints.size(); ++i) {
-    hw_states_[i] = rsi_state_.positions[i] * KukaRSIHardwareInterface::D2R;
     hw_commands_[i] = hw_states_[i];
-    initial_joint_pos_[i] = rsi_state_.initial_positions[i] * KukaRSIHardwareInterface::D2R;
   }
-  ipoc_ = rsi_state_.ipoc;
 
-  out_buffer_ = RSICommand(joint_pos_correction_deg_, ipoc_, stop_flag_).xml_doc;
+  // Initial command pos data
+  command_handler_.SetCommandParam<double>("AK", "A1", joint_pos_correction_deg_[0]);
+  command_handler_.SetCommandParam<double>("AK", "A2", joint_pos_correction_deg_[1]);
+  command_handler_.SetCommandParam<double>("AK", "A3", joint_pos_correction_deg_[2]);
+  command_handler_.SetCommandParam<double>("AK", "A4", joint_pos_correction_deg_[3]);
+  command_handler_.SetCommandParam<double>("AK", "A5", joint_pos_correction_deg_[4]);
+  command_handler_.SetCommandParam<double>("AK", "A6", joint_pos_correction_deg_[5]);
+  command_handler_.SetCommandParam<bool>("Stop", "Stop", stop_flag_);
+  command_handler_.SetCommandParam<int64_t>("IPOC", "IPOC", static_cast<int64_t>(ipoc_));
+
+  auto out_buffer_it = out_buffer_;
+  if (command_handler_.Encode(out_buffer_it, UDP_BUFFER_SIZE) < 0) {
+    RCLCPP_ERROR(rclcpp::get_logger("KukaRSIHardwareInterface"), "Encode Failed");
+    return CallbackReturn::FAILURE;
+  }
   server_->send(out_buffer_);
   server_->set_timeout(1000);  // Set receive timeout to 1 second
 
@@ -178,6 +225,7 @@ CallbackReturn KukaRSIHardwareInterface::on_deactivate(
 {
   stop_flag_ = true;
   RCLCPP_INFO(rclcpp::get_logger("KukaRSIHardwareInterface"), "Stop flag was set!");
+  command_handler_.ResetLocale();
   return CallbackReturn::SUCCESS;
 }
 
@@ -195,12 +243,25 @@ return_type KukaRSIHardwareInterface::read(
     this->on_deactivate(this->get_state());
     return return_type::ERROR;
   }
-  rsi_state_ = RSIState(in_buffer_);
-
-  for (std::size_t i = 0; i < info_.joints.size(); ++i) {
-    hw_states_[i] = rsi_state_.positions[i] * KukaRSIHardwareInterface::D2R;
+  if (!command_handler_.Decode(in_buffer_, UDP_BUFFER_SIZE)) {
+    return return_type::ERROR;
   }
-  ipoc_ = rsi_state_.ipoc;
+  // Update state params
+  hw_states_[0] = angles::from_degrees(
+    command_handler_.GetState().GetElement("AIPos")->GetParam<double>("A1"));
+  hw_states_[1] = angles::from_degrees(
+    command_handler_.GetState().GetElement("AIPos")->GetParam<double>("A2"));
+  hw_states_[2] = angles::from_degrees(
+    command_handler_.GetState().GetElement("AIPos")->GetParam<double>("A3"));
+  hw_states_[3] = angles::from_degrees(
+    command_handler_.GetState().GetElement("AIPos")->GetParam<double>("A4"));
+  hw_states_[4] = angles::from_degrees(
+    command_handler_.GetState().GetElement("AIPos")->GetParam<double>("A5"));
+  hw_states_[5] = angles::from_degrees(
+    command_handler_.GetState().GetElement("AIPos")->GetParam<double>("A6"));
+
+  // Update ipoc
+  ipoc_ = command_handler_.GetState().GetElement("IPOC")->GetParam<int64_t>("IPOC");
   return return_type::OK;
 }
 
@@ -219,11 +280,23 @@ return_type KukaRSIHardwareInterface::write(
   if (stop_flag_) {is_active_ = false;}
 
   for (size_t i = 0; i < info_.joints.size(); i++) {
-    joint_pos_correction_deg_[i] = (hw_commands_[i] - initial_joint_pos_[i]) *
-      KukaRSIHardwareInterface::R2D;
+    joint_pos_correction_deg_[i] = angles::to_degrees(hw_commands_[i] - initial_joint_pos_[i]);
   }
 
-  out_buffer_ = RSICommand(joint_pos_correction_deg_, ipoc_, stop_flag_).xml_doc;
+  // Update Command params
+  command_handler_.SetCommandParam<double>("AK", "A1", joint_pos_correction_deg_[0]);
+  command_handler_.SetCommandParam<double>("AK", "A2", joint_pos_correction_deg_[1]);
+  command_handler_.SetCommandParam<double>("AK", "A3", joint_pos_correction_deg_[2]);
+  command_handler_.SetCommandParam<double>("AK", "A4", joint_pos_correction_deg_[3]);
+  command_handler_.SetCommandParam<double>("AK", "A5", joint_pos_correction_deg_[4]);
+  command_handler_.SetCommandParam<double>("AK", "A6", joint_pos_correction_deg_[5]);
+  command_handler_.SetCommandParam<bool>("Stop", "Stop", stop_flag_);
+  command_handler_.SetCommandParam<int64_t>("IPOC", "IPOC", static_cast<int64_t>(ipoc_));
+
+  auto out_buffer_it = out_buffer_;
+  if (command_handler_.Encode(out_buffer_it, UDP_BUFFER_SIZE) < 0) {
+    return return_type::ERROR;
+  }
   server_->send(out_buffer_);
   return return_type::OK;
 }

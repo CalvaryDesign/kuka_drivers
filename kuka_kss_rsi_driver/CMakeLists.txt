@@ -8,7 +8,7 @@ endif()
 
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -23,26 +23,35 @@ find_package(kuka_drivers_core REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(controller_manager_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(angles REQUIRED)
+find_package(pugixml REQUIRED)
 
-find_package(tinyxml_vendor REQUIRED)
-find_package(TinyXML REQUIRED)
+include_directories(include)
 
-include_directories(include ${TinyXML2_INCLUDE_DIRS})
+add_library(xml_handler SHARED
+  src/xml_handler/xml_element.cpp
+  src/xml_handler/xml_param.cpp
+  src/xml_handler/xml_string.cpp
+)
 
 add_library(${PROJECT_NAME} SHARED
+  # src/kuka_hardware_interface.cpp
+  src/rsi_command_handler.cpp
+  src/pugi_command_handler.cpp
   src/hardware_interface.cpp
 )
 
+target_link_libraries(${PROJECT_NAME} xml_handler pugixml)
+
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
+target_compile_definitions(${PROJECT_NAME} PRIVATE "JOINT_STATE_BROADCASTER_BUILDING_DLL")
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE "KUKA_KSS_RSI_DRIVER_BUILDING_LIBRARY")
 # prevent pluginlib from using boost
 target_compile_definitions(${PROJECT_NAME} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
 
-ament_target_dependencies(${PROJECT_NAME} rclcpp sensor_msgs hardware_interface)
-target_link_libraries(${PROJECT_NAME} tinyxml)
-
-
+ament_target_dependencies(${PROJECT_NAME} rclcpp sensor_msgs hardware_interface angles)
 
 add_executable(robot_manager_node
   src/robot_manager_node.cpp)
@@ -51,7 +60,7 @@ target_link_libraries(robot_manager_node kuka_drivers_core::communication_helper
 
 pluginlib_export_plugin_description_file(hardware_interface hardware_interface.xml)
 
-install(TARGETS ${PROJECT_NAME} robot_manager_node
+install(TARGETS ${PROJECT_NAME} robot_manager_node xml_handler
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
@@ -71,9 +80,12 @@ if(BUILD_TESTING)
   ament_lint_cmake()
   ament_uncrustify(--language=C++)
   ament_xmllint(--exclude ros_rsi.rsi.xml)
+
+  enable_testing()
+  add_subdirectory(test)
 endif()
 
-## EXPORTS
+# # EXPORTS
 ament_export_include_directories(
   include
 )

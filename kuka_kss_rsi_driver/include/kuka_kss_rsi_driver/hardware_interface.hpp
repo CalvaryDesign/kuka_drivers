@@ -48,6 +48,16 @@
 #include <cmath>
 #include <mutex>
 
+#include "kuka_rsi_hw_interface/udp_server.h"
+#include "kuka_rsi_hw_interface/visibility_control.h"
+#include "kuka_rsi_hw_interface/rsi_command_handler.hpp"
+
+#include "hardware_interface/handle.hpp"
+#include "hardware_interface/hardware_info.hpp"
+#include "hardware_interface/system_interface.hpp"
+#include "hardware_interface/types/hardware_interface_return_values.hpp"
+#include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "rclcpp/macros.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/macros.hpp"
 #include "pluginlib/class_list_macros.hpp"
@@ -106,14 +116,10 @@ private:
   std::vector<double> joint_pos_correction_deg_;
 
   uint64_t ipoc_ = 0;
-  RSIState rsi_state_;
-  RSICommand rsi_command_;
+  RSICommandHandler command_handler_;
   std::unique_ptr<UDPServer> server_;
-  std::string in_buffer_;
-  std::string out_buffer_;
-
-  static constexpr double R2D = 180 / M_PI;
-  static constexpr double D2R = M_PI / 180;
+  char in_buffer_[UDP_BUFFER_SIZE] = {0};
+  char out_buffer_[UDP_BUFFER_SIZE] = {0};
 };
 }  // namespace kuka_kss_rsi_driver
 

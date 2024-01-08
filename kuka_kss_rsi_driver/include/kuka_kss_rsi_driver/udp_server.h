@@ -59,6 +59,8 @@
 
 #include "rclcpp/rclcpp.hpp"
 
+constexpr size_t UDP_BUFFER_SIZE = 1024;
+
 class UDPServer
 {
 public:
@@ -103,12 +105,12 @@ public:
     }
   }
 
-  ssize_t send(std::string & buffer)
+  ssize_t send(char * buffer)
   {
     ssize_t bytes = 0;
     bytes = sendto(
-      sockfd_, buffer.c_str(),
-      buffer.size(), 0, (struct sockaddr *) &clientaddr_, clientlen_);
+      sockfd_, buffer,
+      strnlen(buffer, UDP_BUFFER_SIZE), 0, (struct sockaddr *) &clientaddr_, clientlen_);
     if (bytes < 0) {
       RCLCPP_ERROR(rclcpp::get_logger("UDPServer"), "Error in send");
     }
@@ -116,7 +118,7 @@ public:
     return bytes;
   }
 
-  ssize_t recv(std::string & buffer)
+  ssize_t recv(char * buffer)
   {
     ssize_t bytes = 0;
 
@@ -134,25 +136,30 @@ public:
       }
 
       if (FD_ISSET(sockfd_, &read_fds)) {
-        memset(buffer_, 0, BUFSIZE);
+        memset(buffer_, 0, UDP_BUFFER_SIZE);
         bytes =
-          recvfrom(sockfd_, buffer_, BUFSIZE, 0, (struct sockaddr *) &clientaddr_, &clientlen_);
+          recvfrom(
+          sockfd_, buffer_, UDP_BUFFER_SIZE, 0, (struct sockaddr *) &clientaddr_,
+          &clientlen_);
         if (bytes < 0) {
           RCLCPP_ERROR(rclcpp::get_logger("UDPServer"), "Error in receive");
+          return bytes;
         }
       } else {
         return 0;
       }
 
     } else {
-      memset(buffer_, 0, BUFSIZE);
-      bytes = recvfrom(sockfd_, buffer_, BUFSIZE, 0, (struct sockaddr *) &clientaddr_, &clientlen_);
+      memset(buffer_, 0, UDP_BUFFER_SIZE);
+      bytes = recvfrom(
+        sockfd_, buffer_, UDP_BUFFER_SIZE, 0, (struct sockaddr *) &clientaddr_,
+        &clientlen_);
       if (bytes < 0) {
         RCLCPP_ERROR(rclcpp::get_logger("UDPServer"), "Error in receive");
+        return bytes;
       }
     }
-
-    buffer = std::string(buffer_);
+    memcpy(buffer, buffer_, bytes);
 
     return bytes;
   }
@@ -168,7 +175,7 @@ private:
   socklen_t clientlen_;
   struct sockaddr_in serveraddr_;
   struct sockaddr_in clientaddr_;
-  char buffer_[BUFSIZE];
+  char buffer_[UDP_BUFFER_SIZE];
   int optval;
 };
 
