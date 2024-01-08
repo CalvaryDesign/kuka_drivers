@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef  KUKA_RSI_HW_INTERFACE__RSI_COMMAND_HANDLER_HPP_
-#define  KUKA_RSI_HW_INTERFACE__RSI_COMMAND_HANDLER_HPP_
+#ifndef  KUKA_KSS_RSI_DRIVER__RSI_COMMAND_HANDLER_HPP_
+#define  KUKA_KSS_RSI_DRIVER__RSI_COMMAND_HANDLER_HPP_
 
 #include <string>
 
 #include "xml_handler/xml_element.hpp"
 
-namespace kuka_rsi_hw_interface
+namespace kuka_kss_rsi_driver
 {
 
 class RSICommandHandler
@@ -83,7 +83,7 @@ private:
     char * & buffer_it, int & buf_size_left, const xml::XMLElement & element,
     const int & buf_idx);
 };
-}  // namespace kuka_rsi_hw_interface
+}  // namespace kuka_kss_rsi_driver
 
 
-#endif  //  KUKA_RSI_HW_INTERFACE__RSI_COMMAND_HANDLER_HPP_
+#endif  //  KUKA_KSS_RSI_DRIVER__RSI_COMMAND_HANDLER_HPP_

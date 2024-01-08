@@ -48,9 +48,9 @@
 #include <cmath>
 #include <mutex>
 
-#include "kuka_rsi_hw_interface/udp_server.h"
-#include "kuka_rsi_hw_interface/visibility_control.h"
-#include "kuka_rsi_hw_interface/rsi_command_handler.hpp"
+#include "kuka_kss_rsi_driver/udp_server.h"
+#include "kuka_kss_rsi_driver/visibility_control.h"
+#include "kuka_kss_rsi_driver/rsi_command_handler.hpp"
 
 #include "hardware_interface/handle.hpp"
 #include "hardware_interface/hardware_info.hpp"

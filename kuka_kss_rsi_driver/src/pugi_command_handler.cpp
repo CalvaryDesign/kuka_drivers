@@ -13,9 +13,9 @@
 // limitations under the License.
 #include <cstring>
 
-#include "kuka_rsi_hw_interface/pugi_command_handler.hpp"
+#include "kuka_kss_rsi_driver/pugi_command_handler.hpp"
 
-namespace kuka_rsi_hw_interface
+namespace kuka_kss_rsi_driver
 {
 MemoryManager * memory_manager_handler;
 
@@ -55,11 +55,11 @@ char * PugiCommandHandler::Encode(char * buffer, const size_t buffer_size)
 
 void * custom_allocate(size_t size)
 {
-  return kuka_rsi_hw_interface::memory_manager_handler->Allocate(size);
+  return kuka_kss_rsi_driver::memory_manager_handler->Allocate(size);
 }
 void custom_deallocate(void * ptr)
 {
-  kuka_rsi_hw_interface::memory_manager_handler->Deallocate(ptr);
+  kuka_kss_rsi_driver::memory_manager_handler->Deallocate(ptr);
 }
 
 MemoryManager::MemoryManager(std::pmr::memory_resource * upstream)
@@ -89,4 +89,4 @@ void MemoryManager::Deallocate(void * ptr)
   memory_pool_sizes_.erase(memory_pool_it);
 }
 
-}  // namespace kuka_rsi_hw_interface
+}  // namespace kuka_kss_rsi_driver

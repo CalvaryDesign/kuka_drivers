@@ -18,10 +18,10 @@
 #include <iostream>
 #include <clocale>
 
-#include "kuka_rsi_hw_interface/rsi_command_handler.hpp"
+#include "kuka_kss_rsi_driver/rsi_command_handler.hpp"
 #include "rclcpp/rclcpp.hpp"
 
-namespace kuka_rsi_hw_interface
+namespace kuka_kss_rsi_driver
 {
 RSICommandHandler::RSICommandHandler()
 : command_data_structure_("Sen"), state_data_structure_("Rob")
@@ -370,4 +370,4 @@ void RSICommandHandler::update_iterators(
     buf_size_left -= buf_idx;
   }
 }
-}  // namespace kuka_rsi_hw_interface
+}  // namespace kuka_kss_rsi_driver

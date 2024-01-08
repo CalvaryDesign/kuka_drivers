@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef KUKA_RSI_HW_INTERFACE__PUGI_COMMAND_HANDLER_HPP_
-#define KUKA_RSI_HW_INTERFACE__PUGI_COMMAND_HANDLER_HPP_
+#ifndef KUKA_KSS_RSI_DRIVER__PUGI_COMMAND_HANDLER_HPP_
+#define KUKA_KSS_RSI_DRIVER__PUGI_COMMAND_HANDLER_HPP_
 
 #include <pugixml.hpp>
 #include <cstring>
@@ -23,7 +23,7 @@
 #include <map>
 #include <functional>
 
-namespace kuka_rsi_hw_interface
+namespace kuka_kss_rsi_driver
 {
 
 void * custom_allocate(size_t size);
@@ -120,7 +120,7 @@ private:
 };
 
 extern MemoryManager * memory_manager_handler;
-}  // namespace kuka_rsi_hw_interface
+}  // namespace kuka_kss_rsi_driver
 
 
-#endif  // KUKA_RSI_HW_INTERFACE__PUGI_COMMAND_HANDLER_HPP_
+#endif  // KUKA_KSS_RSI_DRIVER__PUGI_COMMAND_HANDLER_HPP_
