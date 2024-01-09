@@ -30,7 +30,7 @@ RSICommandHandler::RSICommandHandler()
   prev_locale_ = std::setlocale(LC_NUMERIC, nullptr);
   // State structure
   // TODO(Komaromi): Later this should be defined by the rsi xml
-  state_data_structure_.Params()["TYPE"] = xml::XMLParam(xml::XMLType::STRING);
+  state_data_structure_.Params()["Type"] = xml::XMLParam(xml::XMLType::STRING);
   // how to get string: std::get<XML::xml_string>(command_data_structure_.params_["TYPE"]).first
   xml::XMLElement RIst_el("RIst");
   RIst_el.Params()["X"] = xml::XMLParam(xml::XMLType::DOUBLE);
