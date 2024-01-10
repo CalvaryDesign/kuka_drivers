@@ -31,6 +31,7 @@
 #include "realtime_tools/thread_priority.hpp"
 int pick_cpu_core(){
  int num_processes = 0;
+ int num_processes_prev = 0;
 
     // Get CPU affinity mask of the current process
     cpu_set_t cpuset;
@@ -39,28 +40,59 @@ int pick_cpu_core(){
         perror("sched_getaffinity");
         return -1;
     }
+    
+    RCLCPP_ERROR_STREAM(rclcpp::get_logger("test"), "num cpus: " << CPU_COUNT(&cpuset));
+    int target_core = 0;
     for(int core_id = 0; core_id < CPU_COUNT(&cpuset); core_id++){
       // Check if the core is in the affinity mask
       if (!CPU_ISSET(core_id, &cpuset)) {
-          std::cerr << "Cannot measure processes on core " << core_id << " because it's not in the process affinity mask.\n";
-          return -1;
+        RCLCPP_ERROR_STREAM(rclcpp::get_logger("test"), "Cannot measure processes on core " <<
+               core_id << " because it's not in the process affinity mask.");
+        return -1;
       }
 
       // Parse /proc/stat for process information
       std::ifstream proc_stat("/proc/stat");
       std::string line;
       while (std::getline(proc_stat, line)) {
-          if (line.find("cpu") == 0 && line.find(" " + std::to_string(core_id) + " ") != std::string::npos) {
-              // Found a process on the target core
-              num_processes++;
+        RCLCPP_INFO_STREAM(rclcpp::get_logger("test"), "line: " << line);
+        RCLCPP_INFO_STREAM(rclcpp::get_logger("test"), "looking for: " << "cpu" + std::to_string(core_id));
+
+        if(line.find("cpu" + std::to_string(core_id)) == 0){
+          RCLCPP_INFO_STREAM(rclcpp::get_logger("test"), "THIS IS THE CRITIAL LINE FOR CORE" << core_id << ": " << line);
+          // now we need to find the next space, after which there will be a number.
+
+          std::stringstream ss(line);
+          std::string word;
+
+          // Get the second word (which is the first number)
+          ss >> word; // throw away the first word
+          ss >> word; // grab the second word! The number of user-space processes.
+          RCLCPP_INFO_STREAM(rclcpp::get_logger("test"), "The word is: " << word);
+          // Convert the word to an integer
+          num_processes = std::stoi(word);
+
+          if(num_processes < num_processes_prev){
+            target_core = core_id;
           }
+          num_processes_prev = num_processes;
+          // RCLCPP_INFO_STREAM(rclcpp::get_logger("test"), "The isolated number is: " << isolated_number);
+
+          // std::cout << "The isolated number is: " << isolated_number << std::endl;
+
+        }
+          // if (line.find("cpu") == 0 && line.find(" " + std::to_string(core_id) + " ") != std::string::npos) {
+          //     // Found a process on the target core
+          //     num_processes++;
+          // }
       }
-      if(num_processes == 0){
-        return core_id;
-      }
+      // if(num_processes == 0){
+      //   return core_id;
+      // }
+      // num_processes = 0;
     }
 
-    return -1;
+    return target_core;
 }
 
 int main(int argc, char ** argv)
