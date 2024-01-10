@@ -104,7 +104,7 @@ def launch_setup(context, *args, **kwargs):
         namespace=ns.perform(context),
         package='kuka_drivers_core',
         executable='control_node',
-        parameters=[robot_description, controller_config, joint_traj_controller_config]
+        parameters=[robot_description, controller_config, joint_traj_controller_config, {"use_fake_hardware": use_fake_hardware}]
     )
     robot_manager_node = LifecycleNode(
         name=['robot_manager'],

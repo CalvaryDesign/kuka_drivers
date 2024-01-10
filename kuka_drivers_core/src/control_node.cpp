@@ -14,6 +14,14 @@
 
 #include <thread>
 #include <memory>
+#include <sys/sysinfo.h>
+#include <iostream>
+#include <fstream>
+#include <sys/sysinfo.h>
+#include <sched.h>
+#include <string>
+#include <vector>
+
 
 #include "controller_manager/controller_manager.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -21,6 +29,39 @@
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <realtime_tools/realtime_publisher.h>
 #include "realtime_tools/thread_priority.hpp"
+int pick_cpu_core(){
+ int num_processes = 0;
+
+    // Get CPU affinity mask of the current process
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    if (sched_getaffinity(0, sizeof(cpuset), &cpuset) == -1) {
+        perror("sched_getaffinity");
+        return -1;
+    }
+    for(int core_id = 0; core_id < CPU_COUNT(&cpuset); core_id++){
+      // Check if the core is in the affinity mask
+      if (!CPU_ISSET(core_id, &cpuset)) {
+          std::cerr << "Cannot measure processes on core " << core_id << " because it's not in the process affinity mask.\n";
+          return -1;
+      }
+
+      // Parse /proc/stat for process information
+      std::ifstream proc_stat("/proc/stat");
+      std::string line;
+      while (std::getline(proc_stat, line)) {
+          if (line.find("cpu") == 0 && line.find(" " + std::to_string(core_id) + " ") != std::string::npos) {
+              // Found a process on the target core
+              num_processes++;
+          }
+      }
+      if(num_processes == 0){
+        return core_id;
+      }
+    }
+
+    return -1;
+}
 
 int main(int argc, char ** argv)
 {
@@ -59,6 +100,34 @@ int main(int argc, char ** argv)
           "New Scheduling Policy: " << policy << std::endl <<
           "New Priority: " << param.sched_priority);
       }
+
+      int core_id = pick_cpu_core();
+      if(core_id >= 0){
+        // set the affinity to the returned core!
+        RCLCPP_WARN_STREAM(controller_manager->get_logger(), "Setting the CPU affinity to " << core_id);
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(core_id, &cpuset);
+
+        int s = pthread_setaffinity_np(this_thread, sizeof(cpu_set_t), &cpuset);
+        if (s != 0)
+            RCLCPP_ERROR_STREAM(controller_manager->get_logger(), "Could not set affinity!");
+
+        /* Check the actual affinity mask assigned to the thread */
+
+        s = pthread_getaffinity_np(this_thread, sizeof(cpu_set_t), &cpuset);
+        if (s != 0)
+            RCLCPP_ERROR_STREAM(controller_manager->get_logger(), "Could not GET affinity!");
+
+        printf("Set returned by pthread_getaffinity_np() contained:\n");
+        for (int j = 0; j < CPU_SETSIZE; j++)
+            if (CPU_ISSET(j, &cpuset))
+                printf("    CPU %d\n", j);
+
+      }
+
+      // return whether fake hardware is used
+      bool fake_hardware = (controller_manager->get_parameter("use_fake_hardware")).as_bool();
       // // publisher for control period
       rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr period_pub = 
         controller_manager->shared_from_this()->create_publisher<std_msgs::msg::Float64MultiArray>("control_period", rclcpp::SystemDefaultsQoS());
@@ -95,6 +164,9 @@ int main(int argc, char ** argv)
               rt_pub.msg_.data[2] = (update_time - read_time).seconds();
               rt_pub.msg_.data[3] = (write_time - update_time).seconds();
               rt_pub.unlockAndPublish();
+            }
+            if(fake_hardware){
+              std::this_thread::sleep_for(dt_ms);
             }
           } else {
             controller_manager->update(controller_manager->now(), dt);
