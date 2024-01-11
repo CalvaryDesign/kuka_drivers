@@ -132,8 +132,10 @@ int main(int argc, char ** argv)
           "New Scheduling Policy: " << policy << std::endl <<
           "New Priority: " << param.sched_priority);
       }
+      // get cpu_core from parameter server
+      int core_id = (controller_manager->get_parameter("cpu_core")).as_int();
 
-      int core_id = pick_cpu_core();
+      // int core_id = pick_cpu_core();
       if(core_id >= 0){
         // set the affinity to the returned core!
         RCLCPP_WARN_STREAM(controller_manager->get_logger(), "Setting the CPU affinity to " << core_id);

@@ -32,6 +32,7 @@ def launch_setup(context, *args, **kwargs):
     joint_traj_controller_config_file = LaunchConfiguration("joint_trajectory_controller_config_file")
     controller_to_load = LaunchConfiguration("controller_to_load")
     ns = LaunchConfiguration('namespace')
+    cpu_core = LaunchConfiguration('cpu_core')
     # if there is an actual namespace, we'll want to append it with "_"
     # so that when it's put into the URDF as the prefix, it'll look nice
     namespace = ns.perform(context)
@@ -104,7 +105,11 @@ def launch_setup(context, *args, **kwargs):
         namespace=ns.perform(context),
         package='kuka_drivers_core',
         executable='control_node',
-        parameters=[robot_description, controller_config, joint_traj_controller_config, {"use_fake_hardware": use_fake_hardware}]
+        parameters=[robot_description, 
+                    controller_config, 
+                    joint_traj_controller_config, 
+                    {"use_fake_hardware": use_fake_hardware},
+                    {"cpu_core": cpu_core}]
     )
     robot_manager_node = LifecycleNode(
         name=['robot_manager'],
@@ -194,5 +199,10 @@ def generate_launch_description():
         description="Motion controller (that is, excluding joint_state_broadcaster) to load. " +
         "Must match the controller named in joint_trajectory_controller_config.yaml " +
         "and ros2_controller_config.yaml"
+    ))
+    launch_arguments.append(DeclareLaunchArgument(
+        'cpu_core',
+        default_value="-1",
+        description="The cpu core that the control_node should run on. Default will pick whatever."
     ))
     return LaunchDescription(launch_arguments + [OpaqueFunction(function=launch_setup)])
